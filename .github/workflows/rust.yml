@@ -1,0 +1,54 @@
+name: Auto Build & Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions/setup-rust@v1
+        with:
+          rust-version: stable
+
+      # Optional: Run tests
+      # - name: Run tests
+      #   run: cargo test --release
+
+      - name: Build release binary
+        run: cargo build --release
+
+      - name: Prepare artifact
+        run: |
+          mkdir -p dist
+          cp target/release/* dist/
+          cp README.md dist/ || true
+
+      - name: Archive build
+        run: |
+          cd dist
+          zip -r ../Hachimi-Edging-${{ github.sha }}.zip .
+        shell: bash
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Automated Build: ${{ github.ref_name }}"
+          draft: false
+          prerelease: false
+          files: Hachimi-Edging-${{ github.sha }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
