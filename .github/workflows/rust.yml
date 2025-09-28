@@ -2,17 +2,14 @@ name: Auto Build & Release
 
 on:
   push:
-    branches:
-      - main
-      - master
-    tags:
-      - 'v*'
+    branches: [main, master]
+    tags: ['v*']
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-
+  build-windows:
+    name: Build for Windows
+    runs-on: windows-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,25 +18,73 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+          target: x86_64-pc-windows-msvc
           override: true
 
       # Optional: Run tests
       # - name: Run tests
-      #   run: cargo test --release
+      #   run: cargo test --release --target x86_64-pc-windows-msvc
 
       - name: Build release binary
-        run: cargo build --release
+        run: cargo build --release --target x86_64-pc-windows-msvc
 
       - name: Prepare artifact
         run: |
-          mkdir -p dist
-          cp target/release/* dist/
+          mkdir dist
+          cp target/x86_64-pc-windows-msvc/release/*.exe dist\ 2>NUL
+          cp README.md dist\ 2>NUL
+
+      - name: Archive build
+        run: powershell Compress-Archive -Path dist\* -DestinationPath Hachimi-Edging-windows-${{ github.sha }}.zip
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "Automated Build: ${{ github.ref_name }}"
+          draft: false
+          prerelease: false
+          files: Hachimi-Edging-windows-${{ github.sha }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-android:
+    name: Build for Android (example, edit as needed)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain for Android
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: aarch64-linux-android
+          override: true
+
+      # - name: Install Android NDK (if needed)
+      #   run: |
+      #     sudo apt-get update
+      #     sudo apt-get install -y unzip
+      #     wget https://dl.google.com/android/repository/android-ndk-r25c-linux.zip
+      #     unzip android-ndk-r25c-linux.zip
+      #     echo "NDK setup steps here"
+
+      # Optional: Set up environment variables for Android cross-compilation
+
+      - name: Build release binary for Android
+        run: cargo build --release --target aarch64-linux-android
+
+      - name: Prepare artifact
+        run: |
+          mkdir dist
+          cp target/aarch64-linux-android/release/* dist/ || true
           cp README.md dist/ || true
 
       - name: Archive build
         run: |
           cd dist
-          zip -r ../Hachimi-Edging-${{ github.sha }}.zip .
+          zip -r ../Hachimi-Edging-android-${{ github.sha }}.zip .
         shell: bash
 
       - name: Create Release
@@ -49,6 +94,6 @@ jobs:
           name: "Automated Build: ${{ github.ref_name }}"
           draft: false
           prerelease: false
-          files: Hachimi-Edging-${{ github.sha }}.zip
+          files: Hachimi-Edging-android-${{ github.sha }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
